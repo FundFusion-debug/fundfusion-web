@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FundFusion - Secure Crypto Asset Management</title>
+    <!-- Tailwind CSS สำหรับดีไซน์ระดับพรีเมียม -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js สำหรับวาดกราฟราคาสินทรัพย์ -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome สำหรับไอคอน -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .menu-slide { transition: transform 0.3s ease-in-out; }
+        .hidden-page { display: none; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans">
+
+    <!-- สไลด์เมนูสามขีด (Hamburger Menu) -->
+    <div id="hamburgerMenu" class="fixed top-0 left-0 h-full w-72 bg-gray-800 z-50 shadow-2xl transform -translate-x-full menu-slide p-6">
+        <div class="flex justify-between items-center mb-8">
+            <h3 class="text-xl font-bold text-emerald-400"><i class="fa-solid fa-bars-staggered mr-2"></i>บริการเสริม</h3>
+            <button onclick="toggleMenu()" class="text-gray-400 hover:text-white text-2xl"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <nav class="space-y-4">
+            <button class="w-full text-left p-3 hover:bg-gray-700 rounded-lg flex items-center"><i class="fa-solid fa-user-pen mr-3 text-emerald-400"></i> แก้ไขโปรไฟล์</button>
+            <button class="w-full text-left p-3 hover:bg-gray-700 rounded-lg flex items-center"><i class="fa-solid fa-key mr-3 text-emerald-400"></i> ข้อมูลและรหัสผ่าน</button>
+            <div class="p-3">
+                <label class="block text-xs text-gray-400 mb-1">เลือกภาษา</label>
+                <select id="langSelect" onchange="changeLang()" class="w-full bg-gray-700 p-2 rounded text-sm text-white">
+                    <option value="TH">TH (ภาษาไทย)</option>
+                    <option value="EN">EN (English)</option>
+                </select>
+            </div>
+            <div class="p-3">
+                <label class="block text-xs text-gray-400 mb-1">เลือกสกุลเงิน</label>
+                <select id="currencySelect" onchange="changeCurrency()" class="w-full bg-gray-700 p-2 rounded text-sm text-white">
+                    <option value="USD">USD ($)</option>
+                    <option value="THB">THB (฿)</option>
+                </select>
+            </div>
+            <button class="w-full text-left p-3 hover:bg-gray-700 rounded-lg flex items-center"><i class="fa-solid fa-headset mr-3 text-emerald-400"></i> ติดต่อฝ่ายบริการ</button>
+            <button class="w-full text-left p-3 hover:bg-gray-700 rounded-lg flex items-center"><i class="fa-solid fa-circle-info mr-3 text-emerald-400"></i> เกี่ยวกับเรา</button>
+            <hr class="border-gray-700 my-4">
+            <button onclick="handleLogout()" class="w-full text-left p-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg flex items-center"><i class="fa-solid fa-right-from-bracket mr-3"></i> ออกจากระบบ</button>
+        </nav>
+    </div>
+
+    <!-- หน้าต่างสกัดกั้นผู้ใช้ (1. Auth Gate: Login/Register) -->
+    <div id="pageAuth" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-700">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-extrabold text-emerald-400 tracking-wider">FUNDFUSION</h1>
+                <p class="text-gray-400 text-sm mt-1">Next-Gen Wealth Infrastructure</p>
+            </div>
+            
+            <!-- ปุ่มสลับโหมด Login / Register -->
+            <div class="flex bg-gray-900 p-1 rounded-xl mb-6">
+                <button onclick="switchAuthTab('login')" id="tabLoginBtn" class="w-1/2 py-2 rounded-lg font-bold bg-emerald-500 text-gray-900 transition-all">เข้าสู่ระบบ</button>
+                <button onclick="switchAuthTab('register')" id="tabRegisterBtn" class="w-1/2 py-2 rounded-lg font-bold text-gray-400 transition-all">สมัครสมาชิก</button>
+            </div>
+
+            <!-- ฟอร์มเข้าสู่ระบบ (Login) -->
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-400 mb-1">Email หรือ เบอร์โทรศัพท์</label>
+                    <input type="text" id="loginId" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white focus:outline-none focus:border-emerald-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-400 mb-1">รหัสผ่าน</label>
+                    <input type="password" id="loginPw" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white focus:outline-none focus:border-emerald-400">
+                </div>
+                <div class="text-right">
+                    <button type="button" onclick="alert('กรุณาติดต่อฝ่ายสนับสนุนเพื่อขอ OTP')" class="text-xs text-emerald-400 hover:underline">ลืมรหัสผ่าน?</button>
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-900 font-bold p-3 rounded-xl shadow-lg transition-all">เข้าสู่ระบบ</button>
+            </form>
+
+            <!-- ฟอร์มสมัครสมาชิก (Register) -->
+            <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-400 mb-1">ชื่อบัญชี (Account Name)</label>
+                    <input type="text" id="regName" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white focus:outline-none focus:border-emerald-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-400 mb-1">Email หรือ เบอร์โทรศัพท์</label>
+                    <input type="text" id="regId" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white focus:outline-none focus:border-emerald-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-400 mb-1">รหัสผ่าน</label>
+                    <input type="password" id="regPw" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white focus:outline-none focus:border-emerald-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-400 mb-1">ยืนยันรหัสผ่าน</label>
+                    <input type="password" id="regPwConfirm" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white focus:outline-none focus:border-emerald-400">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-900 font-bold p-3 rounded-xl shadow-lg transition-all">สร้างบัญชีผู้ใช้ (ระบบสุ่ม ID อัตโนมัติ)</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ส่วนโครงสร้างแอปพลิเคชันหลักหลังจากเข้าสู่ระบบสำเร็จ -->
+    <div id="appInterface" class="hidden-page min-h-screen pb-24">
+        <!-- แถบหัวเว็บด้านบน -->
+        <header class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-40 flex justify-between items-center shadow-md">
+            <div class="flex items-center space-x-3">
+                <button onclick="toggleMenu()" class="text-gray-300 hover:text-white text-xl p-1"><i class="fa-solid fa-bars"></i></button>
+                <span class="text-xl font-black tracking-wider text-emerald-400">FUNDFUSION</span>
+            </div>
+            <div class="flex items-center space-x-2 bg-gray-900 px-3 py-1.5 rounded-full border border-gray-700">
+                <span class="text-xs bg-emerald-500 text-gray-900 font-black px-2 py-0.5 rounded" id="userBadgeLV">LV 0</span>
+                <span class="text-xs text-gray-300 font-mono" id="userBadgeID">ID: --------</span>
+            </div>
+        </header>
+
+        <!-- 2.1 หน้าหลัก (Dashboard / Profile View) -->
+        <main id="viewDashboard" class="p-4 max-w-xl mx-auto space-y-6">
+            <div class="bg-gradient-to-br from-gray-800 to-gray-800/60 p-6 rounded-2xl border border-gray-700 shadow-xl text-center relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-xl"></div>
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400">ยอดเงินทั้งหมด (Total Balance)</h2>
+                <div class="text-4xl font-black text-white my-3 font-mono" id="valTotalBalance">$0.00</div>
+                
+                <div class="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-gray-700/60">
+                    <div class="bg-gray-900/50 p-3 rounded-xl border border-gray-700/50 text-left">
+                        <span class="text-xs text-gray-400 block"><i class="fa-solid fa-chart-line mr-1 text-sky-400"></i>ยอดเงินเทรด</span>
+                        <span class="text-lg font-bold font-mono text-white" id="valTradeBalance">$0.00</span>
+                    </div>
+                    <div class="bg-gray-900/50 p-3 rounded-xl border border-gray-700/50 text-left">
+                        <span class="text-xs text-gray-400 block"><i class="fa-solid fa-wallet mr-1 text-amber-400"></i>ยอดเงินสินทรัพย์</span>
+                        <span class="text-lg font-bold font-mono text-white" id="valAssetBalance">$0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ปุ่มทำธุรกรรมด่วน ฝาก-ถอนเครือข่าย ERC20 -->
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="openTxModal('deposit')" class="bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"><i class="fa-solid fa-circle-arrow-down"></i> ฝากเงิน (ERC20)</button>
+                <button onclick="openTxModal('withdraw')" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white font-black py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2"><i class="fa-solid fa-circle-arrow-up"></i> ถอนเงิน (ERC20)</button>
+            </div>
+
+            <!-- พอร์ตโฟลิโอแสดงรายการเหรียญที่ถือครอง -->
+            <div class="bg-gray-800 rounded-2xl border border-gray-700 p-4 shadow-xl">
+                <h3 class="text-sm font-bold text-gray-300 mb-3 uppercase tracking-wider flex items-center"><i class="fa-solid fa-pie-chart mr-2 text-emerald-400"></i>รายการสินทรัพย์ที่คุณมี (Portfolio)</h3>
+                <div class="space-y-2" id="portfolioList">
+                    <!-- รายการถูกเรนเดอร์ผ่าน JS -->
+                </div>
+            </div>
+        </main>
+
+        <!-- 2.2 หน้าเทรดเก็งกำไรความเสี่ยงสูง (Trading Mode) -->
+        <main id="viewTrading" class="hidden-page p-4 max-w-xl mx-auto space-y-4">
+            <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-xl">
+                <div class="flex justify-between items-center mb-3">
+                    <select id="tradeAssetSelect" onchange="updateTradeChart()" class="bg-gray-900 p-2 rounded-xl text-white font-bold border border-gray-700">
+                        <option value="BTC">Bitcoin (BTC/USDT)</option>
+                        <option value="ETH">Ethereum (ETH/USDT)</option>
+                        <option value="GOLD">XAU/USD (ทองคำ)</option>
+                    </select>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-400 block">ราคาปัจจุบัน</span>
+                        <span class="text-xl font-mono font-black text-emerald-400" id="tradeCurrentPrice">$0.00</span>
+                    </div>
+                </div>
+                <!-- ตัววาดกราฟราคาจำลองแบบรีลไทม์ -->
+                <div class="h-48 bg-gray-900 rounded-xl p-2 border border-gray-700">
+                    <canvas id="livePriceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- ฟอร์มตั้งค่าออร์เดอร์ส่งคำสั่งซื้อขาย -->
+            <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-xl space-y-3">
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Volume (Lot)</label>
+                        <input type="number" id="tradeVol" value="0.1" step="0.01" class="w-full bg-gray-900 p-2 rounded text-center font-mono border border-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Stop Loss (SL)</label>
+                        <input type="number" id="tradeSL" placeholder="0" class="w-full bg-gray-900 p-2 rounded text-center font-mono border border-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Take Profit (TP)</label>
+                        <input type="number" id="tradeTP" placeholder="0" class="w-full bg-gray-900 p-2 rounded text-center font-mono border border-gray-700">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 pt-2">
+                    <button onclick="executeTrade('BUY')" class="bg-sky-500 hover:bg-sky-400 text-gray-950 font-black py-3 rounded-xl shadow-lg transition-all text-center">BUY / LONG</button>
+                    <button onclick="executeTrade('SELL')" class="bg-red-500 hover:bg-red-400 text-gray-950 font-black py-3 rounded-xl shadow-lg transition-all text-center">SELL / SHORT</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- 2.3 หน้าต่างประวัติการเทรดและสัญญาคำสั่งเปิด (Order Management) -->
+        <main id="viewOrders" class="hidden-page p-4 max-w-xl mx-auto space-y-4">
+            <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-xl">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">ออร์เดอร์ที่กำลังทำงานอยู่ (Active Orders)</h3>
+                <div class="space-y-2" id="activeOrdersList">
+                    <!-- รายการออร์เดอร์ที่เปิดอยู่จะแสดงที่นี่ -->
+                </div>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-xl">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">ประวัติรายการสำเร็จ (History Log)</h3>
+                <div class="space-y-2 text-sm text-gray-400 font-mono" id="closedOrdersHistory">
+                    <!-- ประวัติรายการเทรดที่ปิดไปแล้ว -->
+                </div>
+            </div>
+        </main>
+
+        <!-- 2.4 หน้าซื้อเหรียญเก็บสะสมและสมัครสมาชิก/ระบบขุด (Spot & Mining Mode) -->
+        <main id="viewMining" class="hidden-page p-4 max-w-xl mx-auto space-y-6">
+            <!-- ส่วนจัดอันดับระดับสมาชิกและเงื่อนไขการล็อกเหรียญ -->
+            <div class="bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-xl">
+                <h3 class="text-sm font-bold text-gray-300 mb-4 uppercase tracking-wider flex items-center"><i class="fa-solid fa-crown mr-2 text-amber-400"></i>ยกระดับบัญชีสมาชิก (Membership Level)</h3>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <button onclick="upgradeMembership(1, 1000)" class="bg-gray-900 hover:border-emerald-400 p-3 rounded-xl border border-gray-700 text-left">
+                        <div class="font-bold text-emerald-400">Level 1 (รับรางวัล 5%/วัน)</div>
+                        <div class="text-gray-400 mt-1">ต้องมีสินทรัพย์ > $1,000</div>
+                    </button>
+                    <button onclick="upgradeMembership(2, 5000)" class="bg-gray-900 hover:border-emerald-400 p-3 rounded-xl border border-gray-700 text-left">
+                        <div class="font-bold text-purple-400">Level 2 (รับรางวัล 7%/วัน)</div>
+                        <div class="text-gray-400 mt-1">ต้องมีสินทรัพย์ > $5,000</div>
+                    </button>
+                    <button onclick="upgradeMembership(3, 50000)" class="bg-gray-900 hover:border-emerald-400 p-3 rounded-xl border border-gray-700 text-left">
+                        <div class="font-bold text-sky-400">Level 3 (รับรางวัล 10%/วัน)</div>
+                        <div class="text-gray-400 mt-1">ต้องมีสินทรัพย์ > $50,000</div>
+                    </button>
+                    <button onclick="upgradeMembership(4, 750000)" class="bg-gray-900 hover:border-emerald-400 p-3 rounded-xl border border-gray-700 text-left">
+                        <div class="font-bold text-amber-400">Level 4 (รับรางวัล 15%/วัน)</div>
+                        <div class="text-gray-400 mt-1">ต้องมีสินทรัพย์ > $750,000</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ศูนย์ควบคุมเครื่องจักรกลจำลองขุดเหรียญและสัญญาล็อกสินทรัพย์ -->
+            <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-xl space-y-4">
+                <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center"><i class="fa-solid fa-cubes-stacked mr-2 text-emerald-400"></i>ระบบประมวลผลการขุดประจำวัน (24H Loop)</h3>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">เลือกเหรียญที่จะใช้รันการขุด</label>
+                    <select id="mineAssetSelect" class="w-full bg-gray-900 p-3 rounded-xl border border-gray-700 text-white font-bold">
+                        <option value="BTC">Bitcoin (BTC)</option>
+                        <option value="ETH">Ethereum (ETH)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">จำนวนทุนสินทรัพย์ที่ต้องการใส่เพื่อรันเครื่องขุด</label>
+                    <input type="number" id="mineAmount" placeholder="กรอกจำนวนเงินมูลค่าทุน..." class="w-full bg-gray-900 p-3 rounded-xl border border-gray-700 text-white font-mono">
+                </div>
+                <div class="bg-gray-900 p-3 rounded-xl text-xs space-y-1 text-gray-400">
+                    <div class="flex justify-between"><span>รางวัลเหมืองขุดพื้นฐาน:</span><span class="text-white">1% / วัน</span></div>
+                    <div class="flex justify-between"><span>โบนัสพิเศษระดับสมาชิกของคุณ:</span><span class="text-emerald-400 font-bold" id="lblBonusRate">+0%</span></div>
+                </div>
+                <button onclick="startMiningEngine()" id="btnStartMining" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-gray-950 font-black p-4 rounded-xl shadow-lg transition-all">เริ่มรันเครื่องขุดสินทรัพย์</button>
+                <div id="miningCountdown" class="hidden text-center text-xl font-bold font-mono text-amber-400 tracking-wider bg-gray-950/60 p-3 rounded-xl border border-amber-500/20"><i class="fa-solid fa-gear fa-spin mr-2"></i>เครื่องจักรเริ่มทำงานแล้ว: 24:00:00</div>
+            </div>
+        </main>
+
+        <!-- แถบเมนูด้านล่างสุด (Bottom Navigation Bar) -->
+        <nav class="fixed bottom-0 left-0 w-full bg-gray-800 border-t border-gray-700 py-2 px-6 flex justify-between items-center z-40 max-w-xl left-1/2 -translate-x-1/2 rounded-t-2xl shadow-2xl">
+            <button onclick="switchView('viewDashboard')" class="flex flex-col items-center text-emerald-400" id="nav-viewDashboard"><i class="fa-solid fa-wallet text-xl"></i><span class="text-[10px] mt-0.5 font-bold">หน้าหลัก</span></button>
+            <button onclick="switchView('viewTrading')" class="flex flex-col items-center text-gray-400" id="nav-viewTrading"><i class="fa-solid fa-chart-line text-xl"></i><span class="text-[10px] mt-0.5 font-bold">เทรด</span></button>
+            <button onclick="switchView('viewOrders')" class="flex flex-col items-center text-gray-400" id="nav-viewOrders"><i class="fa-solid fa-file-invoice-dollar text-xl"></i><span class="text-[10px] mt-0.5 font-bold">ประวัติเทรด</span></button>
+            <button onclick="switchView('viewMining')" class="flex flex-col items-center text-gray-400" id="nav-viewMining"><i class="fa-solid fa-cubes text-xl"></i><span class="text-[10px] mt-0.5 font-bold">เหมืองขุด</span></button>
+        </nav>
+    </div>
+
+    <!-- หน้าต่างธุรกรรมโมดอล (Modal) ฝากและถอนเงิน ERC20 -->
+    <div id="txModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 border border-gray-700 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl relative">
+            <button onclick="closeTxModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+            
+            <div id="txModalDeposit" class="space-y-4 hidden">
+                <h3 class="text-lg font-bold text-emerald-400 flex items-center"><i class="fa-solid fa-circle-arrow-down mr-2"></i>ธุรกรรมฝากสินทรัพย์ (เครือข่าย ERC20)</h3>
+                <div class="flex flex-col items-center p-4 bg-white rounded-xl">
+                    <!-- คิวอาร์โค้ดบริษัทให้แอดมินสลับไฟล์รูปมาเซฟไว้ -->
+                    <img src="qr-erc20.png" alt="ERC20 QR Code" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=0x137be2e29fd59fcc9a344ec8309672f22b5cc778'" class="w-36 h-36">
+                </div>
+                <div class="bg-gray-900 p-3 rounded-xl border border-gray-700 flex justify-between items-center text-xs">
+                    <span class="font-mono text-gray-400 overflow-hidden text-ellipsis mr-2" id="compWalletAddress">0x137be2e29fd59fcc9a344ec8309672f22b5cc778</span>
+                    <button onclick="copyCompanyAddress()" class="bg-emerald-500 text-gray-900 font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all flex items-center gap-1"><i class="fa-solid fa-copy"></i> Copy</button>
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-xs text-gray-400">กรอกจำนวนเงินที่คุณได้โอนเข้าบัญชีบริษัทจริง ($)</label>
+                    <input type="number" id="depAmount" placeholder="ระบุจำนวนทุน..." class="w-full bg-gray-900 p-2.5 rounded-xl border border-gray-700 font-mono">
+                    <label class="block text-xs text-gray-400">กรอกหลักฐานเลขบล็อกเชน (TxHash / TxID)</label>
+                    <input type="text" id="depHash" placeholder="วางเลขธุรกรรมหลักฐาน..." class="w-full bg-gray-900 p-2.5 rounded-xl border border-gray-700 font-mono">
+                </div>
+                <button onclick="submitDepositNotify()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-900 font-black p-3 rounded-xl transition-all shadow-md">ส่งหลักฐานเพื่อแจ้งยอดฝากเงิน</button>
+            </div>
+
+            <div id="txModalWithdraw" class="space-y-4 hidden">
+                <h3 class="text-lg font-bold text-red-400 flex items-center"><i class="fa-solid fa-circle-arrow-up mr-2"></i>ธุรกรรมถอนเงินเข้ากระเป๋าส่วนตัว (ERC20)</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">วางที่อยู่กระเป๋าเงินปลายทางของคุณ (Destination Address)</label>
+                        <input type="text" id="witAddress" placeholder="0x..." class="w-full bg-gray-900 p-3 rounded-xl border border-gray-700 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">ระบุจำนวนเงินที่จะดึงออก ($)</label>
+                        <input type="number" id="witAmount" placeholder="0.00" class="w-full bg-gray-900 p-3 rounded-xl border border-gray-700 font-mono">
+                    </div>
+                </div>
+                <button onclick="submitWithdrawRequest()" class="w-full bg-red-500 hover:bg-red-400 text-gray-950 font-black p-3 rounded-xl transition-all shadow-md">ยืนยันทำธุรกรรมถอนสินทรัพย์</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== CORE SYSTEM JAVASCRIPT ==================== -->
+    <script>
+        // 🚨 ส่วนตั้งค่ากุญแจสำคัญเชื่อมโยงระบบหลังบ้านของเจ้าของแอป
+        const SUPABASE_URL = "https://zkfzsvvhdsixbyvhhfsa.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_UzGoNoXO2Afxt73RvGcviA_r66yNDNP"; // เปลี่ยนเป็นค่าจริงของคุณที่ก๊อปปี้มา
+
+        // เปิดประตูกระตุ้นใช้งานระบบ Supabase Client
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ตัวแปรเก็บ Session สถานะการทำงานชั่วคราว
+        let currentSessionUser = null;
+        let localBalances = { usdt: 1500.00, btc: 0.05, eth: 1.25 }; // ทุนสมมุติเบื้องต้นสำหรับผู้ใช้ใหม่
+        let userMembershipLevel = 0;
+        let systemCurrency = "USD";
+        let activeOrders = [];
+        let mockPriceHistory = [54200, 54350, 54100, 54500, 54680, 54900, 54850];
+        let priceChartObj = null;
+
+        // สลับฟอร์มระหว่างหน้าลงทะเบียนและล็อกอิน
+        function switchAuthTab(mode) {
+            if(mode === 'login') {
+                document.getElementById('loginForm').classList.remove('hidden');
+                document.getElementById('registerForm').classList.add('hidden');
+                document.getElementById('tabLoginBtn').className = "w-1/2 py-2 rounded-lg font-bold bg-emerald-500 text-gray-900 transition-all";
+                document.getElementById('tabRegisterBtn').className = "w-1/2 py-2 rounded-lg font-bold text-gray-400 transition-all";
+            } else {
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('registerForm').classList.remove('hidden');
+                document.getElementById('tabLoginBtn').className = "w-1/2 py-2 rounded-lg font-bold text-gray-400 transition-all";
+                document.getElementById('tabRegisterBtn').className = "w-1/2 py-2 rounded-lg font-bold bg-emerald-500 text-gray-900 transition-all";
+            }
+        }
+
+        // ระบบสร้าง ID 8 หลักแบบสุ่มและไม่ซ้ำ (Unique User ID Engine)
+        function generateUnique8DigitId() {
+            return Math.floor(10000000 + Math.random() * 90000000);
+        }
+
+        // ฟังก์ชันสมัครสมาชิก (1.2 Register Model)
+        async function handleRegister(e) {
+            e.preventDefault();
+            const email = document.getElementById('regId').value;
+            const password = document.getElementById('regPw').value;
+            const confirm = document.getElementById('regPwConfirm').value;
+            const accountName = document.getElementById('regName').value;
+
+            if(password !== confirm) { alert('รหัสผ่านไม่ตรงกัน!'); return; }
+
+            // 1. ลงทะเบียนผ่านโมดูลหลักของ Supabase Auth
+            const { data: authData, error: authError } = await _supabase.auth.signUp({ email, password });
+            if(authError) { alert('สมัครสมาชิกผิดพลาด: ' + authError.message); return; }
+
+            if(authData.user) {
+                const uniqueId = generateUnique8DigitId();
+                // 2. ส่งข้อมูลบันทึกลงฐานข้อมูลหลักเพื่อเปิดผูกบัญชี
+                const { error: dbError } = await _supabase.from('profiles').insert([
+                    { user_id: uniqueId, uuid: authData.user.id, email: email, name: accountName, lv: 0 }
+                ]);
+                
+                // สุ่มสร้างยอดเงินตั้งต้นจำลองผูกกับบัญชีไอดี
+                await _supabase.from('user_balances').insert([
+                    { user_id: uniqueId, usdt_balance: 1500.00, btc_balance: 0.0, eth_balance: 0.0 }
+                ]);
+
+                if(dbError) { alert('เกิดข้อผิดพลาดในการบันทึกโปรไฟล์ ID: ' + dbError.message); return; }
+                alert('สมัครสมาชิกสำเร็จเรียบร้อย! ไอดีของคุณคือ: ' + uniqueId);
+                switchAuthTab('login');
+            }
+        }
+
+        // ฟังก์ชันเข้าสู่ระบบ (1.1 Login Processing)
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginId').value;
+            const password = document.getElementById('loginPw').value;
+
+            const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+            if(error) { alert('ข้อมูลเข้าสู่ระบบไม่ถูกต้อง: ' + error.message); return; }
+
+            currentSessionUser = data.user;
+            await loadUserProfileAndInterface();
+        }
+
+        // ดึงข้อมูลและเบิกประวัติผู้ใช้มาทำงานบนหน้าหลักสม่ำเสมอ
+        async function loadUserProfileAndInterface() {
+            if(!currentSessionUser) return;
+            
+            const { data: profile, error } = await _supabase.from('profiles').select('*').eq('uuid', currentSessionUser.id).single();
+            if(error || !profile) { alert('ไม่พบรหัสระบบไอดีของคุณ'); return; }
+
+            // บันทึกสถานะผู้ใช้งานลงบนหน้าปัด UI
+            document.getElementById('userBadgeID').innerText = "ID: " + profile.user_id;
+            document.getElementById('userBadgeLV').innerText = "LV " + profile.lv;
+            userMembershipLevel = profile.lv;
+            document.getElementById('lblBonusRate').innerText = "+" + (profile.lv === 1 ? 5 : profile.lv === 2 ? 7 : profile.lv === 3 ? 10 : profile.lv === 4 ? 15 : 0) + "%";
+
+            // ดึงข้อมูลจากกระเป๋าเงินจำลองมาประมวลผล
+            const { data: balances } = await _supabase.from('user_balances').select('*').eq('user_id', profile.user_id).single();
+            if(balances) {
+                localBalances.usdt = balances.usdt_balance;
+                localBalances.btc = balances.btc_balance;
+                localBalances.eth = balances.eth_balance;
+            }
+
+            document.getElementById('pageAuth').classList.add('hidden');
+            document.getElementById('appInterface').classList.remove('hidden-page');
+            
+            calculateAndRenderBalances();
+            initPriceChart();
+        }
+
+        // สูตรคำนวณและธุรกรรมกระเป๋าเงินหน้าโปรไฟล์ (4.1 Summary System)
+        function calculateAndRenderBalances() {
+            const btcPrice = mockPriceHistory[mockPriceHistory.length - 1];
+            const ethPrice = btcPrice / 15; // อัตราส่วนโดยเฉลี่ยสมมุติ
+            
+            const btcValueUSD = localBalances.btc * btcPrice;
+            const ethValueUSD = localBalances.eth * ethPrice;
+            
+            const assetTotalUSD = btcValueUSD + ethValueUSD;
+            const overallTotalUSD = localBalances.usdt + assetTotalUSD;
+
+            const rate = systemCurrency === "THB" ? 35.0 : 1.0;
+            const symbol = systemCurrency === "THB" ? "฿" : "$";
+
+            document.getElementById('valTotalBalance').innerText = symbol + (overallTotalUSD * rate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('valTradeBalance').innerText = symbol + (localBalances.usdt * rate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('valAssetBalance').innerText = symbol + (assetTotalUSD * rate).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            // เรนเดอร์การจำลองกระจายพอร์ตโฟลิโอสินทรัพย์ (Portfolio Items)
+            document.getElementById('portfolioList').innerHTML = `
+                <div class="flex justify-between items-center bg-gray-900 p-3 rounded-xl border border-gray-700/40">
+                    <div class="flex items-center gap-2"><i class="fa-brands fa-bitcoin text-amber-500 text-lg"></i> <div><span class="font-bold block text-white">Bitcoin</span><span class="text-xs text-gray-400 font-mono">${localBalances.btc.toFixed(4)} BTC</span></div></div>
+                    <div class="text-right font-mono text-sm font-bold text-white">${symbol}${(btcValueUSD * rate).toFixed(2)}</div>
+                </div>
+                <div class="flex justify-between items-center bg-gray-900 p-3 rounded-xl border border-gray-700/40 mt-2">
+                    <div class="flex items-center gap-2"><i class="fa-brands fa-ethereum text-sky-400 text-lg"></i> <div><span class="font-bold block text-white">Ethereum</span><span class="text-xs text-gray-400 font-mono">${localBalances.eth.toFixed(4)} ETH</span></div></div>
+                    <div class="text-right font-mono text-sm font-bold text-white">${symbol}${(ethValueUSD * rate).toFixed(2)}</div>
+                </div>
+            `;
+        }
+
+        // เปิดหรือปิดแถบสไลด์ด้านข้าง Hamburger Menu
+        function toggleMenu() {
+            const menu = document.getElementById('hamburgerMenu');
+            if(menu.classList.contains('-translate-x-full')) {
+                menu.classList.remove('-translate-x-full');
+            } else {
+                menu.classList.add('-translate-x-full');
+            }
+        }
+
+        function changeCurrency() {
+            systemCurrency = document.getElementById('currencySelect').value;
+            calculateAndRenderBalances();
+        }
+
+        function changeLang() {
+            alert('เปลี่ยนการตั้งค่าระบบโครงสร้างเป็นพอร์ตภาษา ' + document.getElementById('langSelect').value + ' สำเร็จแล้ว');
+        }
+
+        // ออกจากระบบและเคลียร์เคลียร์เซสชัน
+        function handleLogout() {
+            currentSessionUser = null;
+            document.getElementById('appInterface').classList.add('hidden-page');
+            document.getElementById('pageAuth').classList.remove('hidden');
+            toggleMenu();
+        }
+
+        // สลับเปลี่ยนแท็บหน้าจอมุมมองการทำงาน (Navigation Management)
+        function switchView(targetId) {
+            ['viewDashboard', 'viewTrading', 'viewOrders', 'viewMining'].forEach(id => {
+                document.getElementById(id).classList.add('hidden-page');
+                document.getElementById('nav-' + id).className = "flex flex-col items-center text-gray-400";
+            });
+            document.getElementById(targetId).classList.remove('hidden-page');
+            document.getElementById('nav-' + targetId).className = "flex flex-col items-center text-emerald-400";
+        }
+
+        // ฟังก์ชันวาดระบบกราฟและคำนวณราคาสินทรัพย์ (Price Engine & Charting)
+        function initPriceChart() {
+            const ctx = document.getElementById('livePriceChart').getContext('2d');
+            priceChartObj = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['10m', '9m', '8m', '7m', '6m', '5m', 'Now'],
+                    datasets: [{
+                        label: 'Market Price Trace',
+                        data: mockPriceHistory,
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: false
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            // จำลองราคาวิ่งผันผวนอัตโนมัติ 100% (Real-time Simulation Engine)
+            setInterval(() => {
+                const lastPrice = mockPriceHistory[mockPriceHistory.length - 1];
+                const shift = (Math.random() - 0.48) * 120;
+                const nextPrice = Math.max(100, lastPrice + shift);
+                mockPriceHistory.shift();
+                mockPriceHistory.push(nextPrice);
+                if(priceChartObj) {
+                    priceChartObj.data.datasets[0].data = mockPriceHistory;
+                    priceChartObj.update();
+                }
+                document.getElementById('tradeCurrentPrice').innerText = "$" + nextPrice.toFixed(2);
+            }, 3000);
+        }
+
+        function updateTradeChart() {
+            const asset = document.getElementById('tradeAssetSelect').value;
+            if(asset === 'BTC') mockPriceHistory = [54200, 54350, 54100, 54500, 54680, 54900, 54850];
+            if(asset === 'ETH') mockPriceHistory = [3100, 3120, 3090, 3150, 3180, 3210, 3195];
+            if(asset === 'GOLD') mockPriceHistory = [2310, 2325, 2315, 2340, 2335, 2360, 2355];
+        }
+
+        // ระบบเปิดออร์เดอร์ส่งคำสั่งเทรด (2.2 High-Risk Speculation Trading Method)
+        function executeTrade(type) {
+            const asset = document.getElementById('tradeAssetSelect').value;
+            const lot = parseFloat(document.getElementById('tradeVol').value);
+            const entry = mockPriceHistory[mockPriceHistory.length - 1];
+            
+            const cost = lot * 1000; // ทุนจำลองคำนวณสัญญาล็อต
+            if(localBalances.usdt < cost) { alert('แจ้งเตือน: ยอดเงินเทรดของคุณไม่เพียงพอทำรายการนี้!'); return; }
+
+            localBalances.usdt -= cost;
+            const newOrder = {
+                id: Math.floor(Math.random() * 9000),
+                asset: asset,
+                type: type,
+                lot: lot,
+                entry: entry,
+                sl: document.getElementById('tradeSL').value || 'None',
+                tp: document.getElementById('tradeTP').value || 'None'
+            };
+            activeOrders.push(newOrder);
+            calculateAndRenderBalances();
+            renderActiveOrders();
+            alert(`เปิดสัญญาความเสี่ยงสูง ${type} ของสินทรัพย์ ${asset} สำเร็จแล้ว!`);
+        }
+
+        function renderActiveOrders() {
+            const container = document.getElementById('activeOrdersList');
+            if(activeOrders.length === 0) { container.innerHTML = `<div class='text-xs text-gray-500 py-2'>ไม่มีสัญญาที่ติดสถานะค้างในพอร์ต</div>`; return; }
+            container.innerHTML = activeOrders.map(o => `
+                <div class="bg-gray-900 p-3 rounded-xl border border-gray-700 text-xs flex justify-between items-center font-mono">
+                    <div>
+                        <span class="font-bold text-white">${o.asset}</span> 
+                        <span class="${o.type === 'BUY' ? 'text-sky-400':'text-red-400'} font-black ml-1">${o.type} ${o.lot} Lot</span>
+                        <div class="text-[10px] text-gray-500">Entry: $${o.entry.toFixed(2)} | SL: ${o.sl} | TP: ${o.tp}</div>
+                    </div>
+                    <button onclick="closeActiveOrder(${o.id})" class="bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1 rounded-lg hover:bg-red-500/40 transition-all font-sans font-bold">ปิดออร์เดอร์</button>
+                </div>
+            `).join('');
+        }
+
+        // ยืนยันการปิดรับรู้และสรุปผลกำไร/ขาดทุน
+        function closeActiveOrder(id) {
+            if(!confirm('คุณต้องการยืนยันการ "ปิดออร์เดอร์" นี้ เพื่อสรุปผลยอดเงินใช่หรือไม่?')) return;
+            const orderIndex = activeOrders.findIndex(o => o.id === id);
+            if(orderIndex > -1) {
+                const o = activeOrders[orderIndex];
+                const current = mockPriceHistory[mockPriceHistory.length - 1];
+                let profitFactor = o.type === 'BUY' ? (current - o.entry) : (o.entry - current);
+                let pnl = profitFactor * o.lot * 10;
+                
+                const returnCapitalAndPnl = (o.lot * 1000) + pnl;
+                localBalances.usdt += Math.max(0, returnCapitalAndPnl);
+
+                const log = `[ปิดสัญญา #${o.id}] ${o.asset} | ${o.type} -> ผลกำไร/ขาดทุน: $${pnl.toFixed(2)}`;
+                const historyBox = document.getElementById('closedOrdersHistory');
+                historyBox.innerHTML = `<div>${log}</div>` + historyBox.innerHTML;
+
+                activeOrders.splice(orderIndex, 1);
+                calculateAndRenderBalances();
+                renderActiveOrders();
+            }
+        }
+
+        // 3.1 ตรรกะคุมระดับสมาชิกและสัญญาล็อกสินทรัพย์ (Membership Verification Core)
+        async function upgradeMembership(level, threshold) {
+            const btcPrice = mockPriceHistory[mockPriceHistory.length - 1];
+            const currentAssetUSD = (localBalances.btc * btcPrice) + (localBalances.eth * (btcPrice / 15));
+
+            if(currentAssetUSD < threshold) {
+                alert(`ปฏิเสธการปรับระดับ: มูลค่าเงินฝากและยอดสินทรัพย์รวมของคุณมีมูลค่าเพียง $${currentAssetUSD.toFixed(2)} ซึ่งไม่เกินกำหนดขั้นต่ำ $${threshold.toLocaleString()} ของเลเวลนี้`);
+                return;
+            }
+
+            if(!currentSessionUser) return;
+            const { data: profile } = await _supabase.from('profiles').select('user_id').eq('uuid', currentSessionUser.id).single();
+            
+            // ส่งค่าอัปเกรดปรับระดับสิทธิ์สมาชิกบนฐานข้อมูลคลาวด์
+            const { error } = await _supabase.from('profiles').update({ lv: level }).eq('user_id', profile.user_id);
+            if(!error) {
+                alert(`🎉 ยินดีด้วย! บัญชีของคุณได้รับอนุมัติปรับเป็นระดับ Level ${level} สำเร็จ ระบบทำการเปิดล็อกสินทรัพย์ห้ามจำหน่ายจนกว่าจะมีทุนข้ามระดับขั้นถัดไป!`);
+                await loadUserProfileAndInterface();
+            }
+        }
+
+        // 3.2 ลูปการทำงานระบบจำลองเครื่องจักรขุดสินทรัพย์ประจำวัน (24-Hour Mining Engine)
+        function startMiningEngine() {
+            const asset = document.getElementById('mineAssetSelect').value;
+            const amountInput = parseFloat(document.getElementById('mineAmount').value);
+            if(isNaN(amountInput) || amountInput <= 0) { alert('กรุณาระบุจำนวนทุนที่ต้องการขุดให้ถูกต้อง!'); return; }
+
+            const maxAvailable = asset === 'BTC' ? localBalances.btc * mockPriceHistory[mockPriceHistory.length - 1] : localBalances.eth * (mockPriceHistory[mockPriceHistory.length - 1]/15);
+            if(amountInput > maxAvailable) { alert('ยอดเงินสำหรับสั่งงานระบบขุดสินทรัพย์ไม่พอ!'); return; }
+
+            document.getElementById('btnStartMining').classList.add('hidden');
+            const cdBox = document.getElementById('miningCountdown');
+            cdBox.classList.remove('hidden');
+
+            let secondsLeft = 10; // จำลองความเร็วตัดรอบลูป 24 ชม. ให้เห็นใน 10 วินาทีเพื่อการทดสอบ
+            const interval = setInterval(() => {
+                secondsLeft--;
+                cdBox.innerText = `เครื่องจักรเริ่มทำงานแล้ว: 00:00:0${secondsLeft}`;
+                if(secondsLeft <= 0) {
+                    clearInterval(interval);
+                    cdBox.classList.add('hidden');
+                    document.getElementById('btnStartMining').classList.remove('hidden');
+
+                    // ตรรกะคำนวณและจ่ายเปอร์เซ็นต์รางวัลที่ได้รับ
+                    let baseRate = 0.01;
+                    if(userMembershipLevel === 1) baseRate = 0.05;
+                    if(userMembershipLevel === 2) baseRate = 0.07;
+                    if(userMembershipLevel === 3) baseRate = 0.10;
+                    if(userMembershipLevel === 4) baseRate = 0.15;
+
+                    const rewardUSD = amountInput * baseRate;
+                    const btcPrice = mockPriceHistory[mockPriceHistory.length - 1];
+                    
+                    if(asset === 'BTC') {
+                        localBalances.btc += rewardUSD / btcPrice;
+                    } else {
+                        localBalances.eth += rewardUSD / (btcPrice / 15);
+                    }
+
+                    calculateAndRenderBalances();
+                    alert(`[ครบรอบลูป 24 ชม.] เครื่องจักรประมวลผลสำเร็จและโอนบวกเพิ่มรางวัลส่วนแบ่งเข้าสู่พอร์ตโฟลิโอของคุณแล้ว!`);
+                }
+            }, 1000);
+        }
+
+        // จัดการหน้าจอโมดอล (Modal) ทำธุรกรรมทางการเงินเครือข่าย ERC20
+        function openTxModal(mode) {
+            document.getElementById('txModal').classList.remove('hidden');
+            if(mode === 'deposit') {
+                document.getElementById('txModalDeposit').classList.remove('hidden');
+                document.getElementById('txModalWithdraw').classList.add('hidden');
+            } else {
+                document.getElementById('txModalDeposit').classList.add('hidden');
+                document.getElementById('txModalWithdraw').classList.remove('hidden');
+            }
+        }
+
+        function closeTxModal() {
+            document.getElementById('txModal').classList.add('hidden');
+        }
+
+        function copyCompanyAddress() {
+            const addr = document.getElementById('compWalletAddress').innerText;
+            navigator.clipboard.writeText(addr);
+            alert('คัดลอกที่อยู่กระเป๋าเงิน ERC20 บริษัทไปยังคลิปบอร์ดแล้ว!');
+        }
+
+        // ส่งรายงานหลักฐานและสร้างคิวรับยอดฝากเงิน (Pending Audit Trigger)
+        async function submitDepositNotify() {
+            const amount = parseFloat(document.getElementById('depAmount').value);
+            const hash = document.getElementById('depHash').value;
+            if(isNaN(amount) || !hash) { alert('กรุณากรอกข้อมูลและเลขหลักฐานให้ครบถ้วน!'); return; }
+
+            if(!currentSessionUser) return;
+            const { data: profile } = await _supabase.from('profiles').select('user_id').eq('uuid', currentSessionUser.id).single();
+
+            // แทรกรายการใหม่เข้าไปในตารางฐานข้อมูลส่วนกลางให้คุณอนุมัติ
+            const { error } = await _supabase.from('deposits').insert([
+                { user_id: profile.user_id, amount: amount, tx_hash: hash, status: 'pending' }
+            ]);
+
+            if(!error) {
+                alert('ส่งข้อมูลแจ้งฝากเงินสำเร็จ! สถานะของคุณคือ " pending " กรุณารอแอดมินฝ่ายบัญชีตรวจสอบบล็อกเชนเพื่อทำรายการอนุมัติยอดเงินในระบบ');
+                closeTxModal();
+            } else {
+                alert('เกิดข้อผิดพลาดส่งข้อมูล: ' + error.message);
+            }
+        }
+
+        // ทำเรื่องขอถอนเงินออกจากระบบเข้ากระเป๋าส่วนตัว
+        function submitWithdrawRequest() {
+            const addr = document.getElementById('witAddress').value;
+            const amount = parseFloat(document.getElementById('witAmount').value);
+            if(!addr || isNaN(amount) || amount <= 0) { alert('ข้อมูลถอนเงินไม่ถูกต้อง'); return; }
+
+            if(localBalances.usdt < amount) { alert('ยอดเงินสดคงเหลือสะสมเสรีของคุณไม่พอถอนในกรณีนี้'); return; }
+
+            localBalances.usdt -= amount;
+            calculateAndRenderBalances();
+            alert('คำขอถอนเงินของคุณส่งไปยังระบบคิวศูนย์กลางบริษัทแล้ว บริษัทจะดำเนินการโอนเงินออกให้ภายใน 24 ชม.!');
+            closeTxModal();
+        }
+    </script>
+</body>
+</html>
