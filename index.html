@@ -392,30 +392,46 @@
 
         // ดึงข้อมูลและเบิกประวัติผู้ใช้มาทำงานบนหน้าหลักสม่ำเสมอ
         async function loadUserProfileAndInterface() {
-            if(!currentSessionUser) return;
-            
-            const { data: profile, error } = await _supabase.from('profiles').select('*').eq('uuid', currentSessionUser.id).single();
-            if(error || !profile) { alert('ไม่พบรหัสระบบไอดีของคุณ'); return; }
+    if (!currentSessionUser) return;
+    
+    // พยายามหาจาก uuid ตามปกติ
+    let { data: profile, error } = await _supabase.from('profiles').select('*').eq('uuid', currentSessionUser.id).single();
+    
+    // ถ้าไม่เจอ ให้ลองหาจาก email แทน (เพื่อป้องกันเคสข้อมูล uuid ผิดพลาด)
+    if (error || !profile) {
+        const { data: profileByEmail, error: error2 } = await _supabase.from('profiles').select('*').eq('email', currentSessionUser.email).single();
+        profile = profileByEmail;
+        error = error2;
+    }
 
-            // บันทึกสถานะผู้ใช้งานลงบนหน้าปัด UI
-            document.getElementById('userBadgeID').innerText = "ID: " + profile.user_id;
-            document.getElementById('userBadgeLV').innerText = "LV " + profile.lv;
-            userMembershipLevel = profile.lv;
-            document.getElementById('lblBonusRate').innerText = "+" + (profile.lv === 1 ? 5 : profile.lv === 2 ? 7 : profile.lv === 3 ? 10 : profile.lv === 4 ? 15 : 0) + "%";
+    // ถ้ายังไม่เจอข้อมูลทั้งสองทาง ให้แจ้งเตือน
+    if (error || !profile) { 
+        alert('ไม่พบข้อมูลโปรไฟล์ในระบบ (กรุณาตรวจสอบว่าลงทะเบียนสำเร็จหรือไม่)'); 
+        return; 
+    }
 
-            // ดึงข้อมูลจากกระเป๋าเงินจำลองมาประมวลผล
-            const { data: balances } = await _supabase.from('user_balances').select('*').eq('user_id', profile.user_id).single();
-            if(balances) {
-                localBalances.usdt = balances.usdt_balance;
-                localBalances.btc = balances.btc_balance;
-                localBalances.eth = balances.eth_balance;
-            }
+    // บันทึกสถานะผู้ใช้งานลงบนหน้าปัด UI
+    document.getElementById('userBadgeID').innerText = "ID: " + (profile.user_id || "N/A");
+    document.getElementById('userBadgeLV').innerText = "LV " + (profile.lv || 0);
+    userMembershipLevel = profile.lv || 0;
+    
+    // ตั้งค่าโบนัสตามเลเวล
+    const bonus = profile.lv === 1 ? 5 : profile.lv === 2 ? 7 : profile.lv === 3 ? 10 : profile.lv === 4 ? 15 : 0;
+    document.getElementById('lblBonusRate').innerText = "+" + bonus + "%";
 
-            document.getElementById('pageAuth').classList.add('hidden');
-            document.getElementById('appInterface').classList.remove('hidden-page');
-            
-            calculateAndRenderBalances();
-            initPriceChart();
+    // ดึงข้อมูลจากกระเป๋าเงิน
+    const { data: balances } = await _supabase.from('user_balances').select('*').eq('user_id', profile.user_id).single();
+    if(balances) {
+        localBalances.usdt = balances.usdt_balance || 0;
+        localBalances.btc = balances.btc_balance || 0;
+        localBalances.eth = balances.eth_balance || 0;
+    }
+
+    document.getElementById('pageAuth').classList.add('hidden');
+    document.getElementById('appInterface').classList.remove('hidden-page');
+    
+    calculateAndRenderBalances();
+    initPriceChart();
         }
 
         // สูตรคำนวณและธุรกรรมกระเป๋าเงินหน้าโปรไฟล์ (4.1 Summary System)
